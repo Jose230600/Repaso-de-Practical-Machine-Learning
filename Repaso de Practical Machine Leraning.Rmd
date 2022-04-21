@@ -1,0 +1,1164 @@
+---
+title: "repaso de practical Machine Learning"
+output: html_document
+author: Jose Luis
+---
+
+buscar el link en mis repositorios
+
+[Link del código](https://github.com/Jose230600/Repaso-de-Practical-Machine-Learning)
+
+Nota:En el documento puede que se presenten varios errores de ortografía asi como varios caracteres extraños que puedan hacer que se pierda interpretación, por lo cual de ser así me disculpo de antemano, ya que no los corrigo debido a mi escacez de tiempo. Gracias.
+
+Nota: tambien debido a la escacez del tiempo, las interpretaciones estadisticas que se relizaron fueron muy someras, por lo que pueden haber errores, y el contenido de este documento no tiene nungun caracter cientifico serio oficial que lleve a tomar desiciones de tal tipo ni nada por el estilo.
+
+# Objetivo 
+
+El objetivo principal de este documento simplemente es **poner en práctica** ciertas funciones que aprendí en el curso de Practical Machine Learning dado en Coursera por parte de la universidad John hopkins university.
+
+# Conceptos iniciales
+inicialmente se comienza el curo, mostrando de cierta forma como los pasos de la prediccion, lo tipico de hacer uan rpegnta antes, conseguir datos... y se empeizam mosntrado un ejeplo basico de preddcicon usando condicionales, simplemente decirle al modo que si tal media es mayor a tal valor, sera calsficado de alguna forma el valor, y si no deo tra forma, para ello se hacen funciones de densidad, o graficos de diserpsion, para asi determinar posibles "reglas" de desicion; a parte de esto, nombran caracterisitcas de buenos features, y 5 caracteristicas de un buen modelo de predicion, siendo rapido para el conjunto de train y test, escalabe, simple, interpretable y preciso, lo cual ps en general son unas por otras en general la presicion en contra de loas otras otras, osea si es sencillo entocnesn otendra buena presicion y asi; otro concepto es el de in sample error y out sample error, que simpelmente se refiere a la medida de error del modelo en el conjkunto dedatos donde se creo y en otro conjunto de datos nuevo(in y out respeectivamente), siendo ps el importante el segundo.
+
+### sobreajuste y objetivo del modelo
+
+otro concepto inciial pero a destacar, fue el del sibre ajuste, para esto se ejempifco el caso en el q un modelo se creaba para q se predijera exacmante la calsfiicaicon real del conjutno de datos de train asi no fuera logico(decir que si estaba entre tal y tal era tal y asi) y al probar este modelo con datos exteriores, el modelo era bastante malo y es porque el **objetivo del predcitor es caputar la señal** y no el ruido de los datos, lo cual es lo que sucede al hace el sobreajuste
+
+### lo del modelo con condicionales
+primero leemos los datos conlos que trabajaremos en este proyecto
+
+```{r}
+#UrlDelArchivo <- "https://datosabiertos.bogota.gov.co/dataset/e8bbee49-fa9f-46d2-a357-3846db5a737e/resource/40ffd4bb-a09d-47e5-8d92-5f0c5dde65c5/download/parques_urbanos.csv"
+#download.file(UrlDelArchivo,destfile = "Lectura.csv")
+```
+
+```{r}
+library(ggplot2)
+datos <- read.csv("Lectura.csv",sep=";",dec=",")
+dim(datos)
+```
+
+```{r}
+head(datos)
+```
+```{r}
+sapply(datos,class)
+```
+```{r}
+datos$TIPO <- as.factor(datos$TIPO)
+sapply(datos,class)
+```
+```{r}
+plot(density(datos$SHAPE_AREA[datos$TIPO=="Parque Zonal"]),col="red")
+points(density(datos$SHAPE_AREA[datos$TIPO=="Parque Metropolitano"]),col="blue")
+```
+```{r}
+plot(datos$SHAPE_AREA,col=datos$TIPO)
+legend("topright",pch=c(19,19),col=c("red","black"),legend=c("parque zonal","parque metropolitano"))
+abline(h=50000,col="dark green")
+
+```
+observandio los dos graficos, de cierto analisis exploratiorio, se puede decir que pdoria ser una buena regla de desicion decique que si el area es mayor a 50000 metros cuadrados, entonces sera parque metropolitano, de lo contrario sera zonal
+
+```{r}
+prediccion <- ifelse(datos$SHAPE_AREA>50000,"Parque Metropolitano","Parque Zonal")
+table(prediccion,datos$TIPO)
+```
+```{r}
+table(prediccion, datos$TIPO)/length(datos$TIPO)
+```
+si observamos lo anterior, y sumamos el 0.22 de verdaderos positivos(el 25) y el 0.54 de verdaderos negativos(61), obtenemos una presicion del modelo de alrededor del 77%, aca es donde en el curso se mostra que si se hubuese sacado una regla de desicion exata, que entre tal rangio y tal los valoers perfetos, huiese dato un 100% de presicion, pero al probarlo en otro data set, ese modelo era mas malo que este; la otra cosa a resltar, es que a partir de esta tablas, se peuden empezar a sacar medidas como la especificida, sensitividad, las cuales son buenos indices para mirar que tan bueno es el predictor, persoanlmente sietno que el valor psotiivo predcirdo y el valor negativo predecido(los contrarios a espcificidad y sensitividad) son como los mas indicativos, debido a que me diran la probabildiad de que el dato que predigamos sea realemnte positivo dado que el modelo nos dice que es positivo, sin emabrgo estos los calcularemos cuando apliquemso la matriz de confusion, que efectiavmente nos entrega directamente estas medidas, ademas de esto con la espicifdad y sensitivdad se peude graficar al curva ROC, sin embargo esta la explicare a mas detalle cuando se comapren varios modelos, debido que para eso es su uso.
+
+### Proceso de predicción
+
+En el curso, a grandes rasgos se explica como de manera general, deberia ser el proceso de prediccion, inicialmente se parten los datos en traing y test e idealmente **el conjutno de test NUNCA SE PEUDE USAR PARA NADA QUE TENGA QUE VER CON EL AJKUSTE DEL MODELO**, esto porque se crearia sobreajsute, despues de esta divison se seleecionan las caracatersiticas o features o columnas o predictores del modelo, donde se nombra que para la seleecion de estas se pdoria utilizar validacion cruzada en el tarinign set,**(sucede, que en priemra medida el curso solo nombra eso, no dice dem anera practica como se haria, pero yo buscando por aparte, encuentro que la situacion normal, es que digmoas para este caso mediante uan regresion ligistica predicmos el tipo de parque, entonces puede que hayamos usado el area, la longitud, o alguna covaraible entre las dos y probelmos ese modelo en el test, entonces si mirarmos el error en el trainign, y el error en el test, si hubise muhca diferencia, entonces queire decir q hay algun sobre ajuste, entonces uno se pdoria devolver y incluir las dos varaibles o algo asi que al probarlo en el test salga un mejor modelo entonecs esas caracteriscas o features serian las adecuadas, PERO EL PROBLEMA DE ESTO, es que al hacerlo el test set de cierta forma se vuevle como el conjunto de training, por lo que la idea de la valdiacion cruzada, es crear unos sub conjuntos de test en el mismo conunto training, para ir haciedno esa prueba q decimos y encontrar el mejor modelo, entonces es un proceso "explosiVo", ya que digamos que se tendria una regresion con solo el area, y a esta se le haria validacion cruzada para sacar un error promeido de solo ese modelo (al probar ese mdoelo en variso sub test), y una vez hecho eso, se comapraria ese eror promedio, con otro error proemdio de hacer el mismo modelo, pero con area y longitud, ymirando asi cual es el mejor)**, una vez seleecioandas las variables, ya sea por esa forma(sabemso que para al regreso multiple habia otros analsisi de anova y eso) se peude nuevamente utilziar validacion cruzada para seleecionar, el mejor modelo, en este caso, no serai comparar uan regresion logistica con esas dos varaibles, sino con esas dos variables comrpar los idnciadores de otro mdoelo como arboles de desion y esos,*(sucede que en terminos practiocos me parece que tambien tendria que priemro haber probado las mejores variables para ese otro tipo de modelo (esto lo digo asi de cierta forma a mi perspetica por lo que digo qu en el curso no se ejemplifico dem anera opractica esto))* y una ves selecionado ya el modelo definitivo, se procede a priobarlo ya en el test set del inidio que nuca se debio tocar antes, para evaluar el verdadero poder dep redicion del modelo.
+
+#### division de los datos:
+
+```{r}
+library(caret)
+
+datos$Binaria <- ifelse(datos$TIPO=="Parque Zonal",1,0)
+datos$Binaria <- as.factor(datos$Binaria)
+
+set.seed(17)
+
+inTrain <-createDataPartition(y=datos$Binaria,p=0.75,list=FALSE)
+training <- datos[inTrain,]
+test <- datos[-inTrain,]
+
+```
+
+#### seleecion de features:
+para esta parte, en el curso no se muestra de maenra puntual, se mseutra es la division de muestras del training set para hacer las pruebas
+
+```{r}
+set.seed(17)
+folds <- createFolds(y=training$Binaria,k=3)
+test1 <- folds[[1]]
+test2 <- folds[[2]]
+test3 <- folds[[3]]
+
+
+
+modelo1 <-  glm(Binaria ~ SHAPE_AREA,data = training[-test1,],family="binomial")
+prediccion1 <- ifelse(predict(modelo1,newdata=training[test1,])>=0.5,1,0) 
+prediccion1 <- as.factor(prediccion1)
+  
+  confusionMatrix(prediccion1,training[test1,]$Binaria)
+  
+indices <- c()  
+  
+indices[1] <- confusionMatrix(prediccion1,training[test1,]$Binaria)$overall[1]#guardamos la presicion de este modelo
+  
+```
+
+Basicamente lo que se realiza anteriormente, es a partir del primer trainig data que es un subconjunto del traing data global, se hace un mdoelo de regresion logistica, que predice si el parque es zonal o metropolitano, donde a partir de el prmer subcojunto de test data correspondeiento a este trainign data pro el metodo de k folds, se prueba el modelo, donde se resalta que a la regresin lgiositoa dar como predcion probaildiades, se le especifica que si es mayor a 0.5 corerspodna a la catergoira 1 y si es menor correpsonda a la categia 0, y depseus e realiza la matriz de confusin, para obtener diferentes medias de desempeño, en este modelo aprticular, para el primer training y test set del metodo de validacion curzada con k igual a 3, se obtioene que el modelo es mejor para la predcion de valores "negativos" referenciadose estos a el nivel 1 o tipo de parque zonal, entonces por ejemplo se tiene una praobildiad del 90% de que si el modelo nos dice que dado un valor de area cualquiera, el parque sera zonal esto sera cierto, por lo que es un buen clasificador de parques zonales, sin mebargo para el parque metropolitano ya es menor esta rpobaiblidad, esto se peude dar, debuido a que realmente no hay muchos datos sobre parques metropolitanos, por lo que el modelo logra mas la clasificacion de parques zonales, como se observa en la siguiente grafica
+
+```{r}
+
+
+plot(training[-test1,]$SHAPE_AREA,as.numeric(as.character(training[-test1,]$Binaria)))
+points(training[-test1,]$SHAPE_AREA,modelo1$fitted.values,pch=19,col="blue")
+```
+notece como el conglomerado de arriba de datos es mas de la lcase 1 o parque zonal, por ello el modelo funciona mejor para esos datos
+
+ahora, la idea de la validacion cruizada es repetir esto mismo pero en el resto de conjuntos partidos pro algun metodo, y obtener el promedio del indice de evalcuion
+
+```{r}
+modelo2 <-  glm(Binaria ~ SHAPE_AREA,data = training[-test2,],family="binomial")
+prediccion2 <- ifelse(predict(modelo2,newdata=training[test2,])>=0.5,1,0) 
+prediccion2 <- as.factor(prediccion2)
+
+indices[2] <- confusionMatrix(prediccion2,training[test2,]$Binaria)$overall[1]
+
+
+
+```
+
+
+```{r}
+modelo3 <-  glm(Binaria ~ SHAPE_AREA,data = training[-test3,],family="binomial")
+prediccion3 <- ifelse(predict(modelo3,newdata=training[test3,])>=0.5,1,0) 
+prediccion3 <- as.factor(prediccion3)
+
+indices[3] <- confusionMatrix(prediccion3,training[test3,]$Binaria)$overall[1]
+
+mean(indices)
+```
+teniendo en cuenta la validacion cruzada, para este modelo habria en proemdio una presicion del 84%
+
+
+```{r}
+set.seed(17)
+train.control <- trainControl(method="cv",number=3)
+modelos <- train(Binaria~SHAPE_AREA,data=training,method="glm",trControl=train.control)
+modelos
+```
+notece como el resultado anterior da muy similar al que fue realizado "manualmente", sucede que lo realice en primera medida para entender el conpeto y en segunda, porque realemtne en el curso, esto no se aplico dem anera practica, por lo que la segunda forma de ahcerlo con la funcion traingControl y eso fue algo qeu encontre en internet, pero siguiendo la idea del curso, esta parciticion que se hizo de maenra "manual" tambien se peude raelizar cambiando algunos parametos de la funcion createPartition, como un muestreo aleatorio(que de cierta forma no estoy seguro si el que hice fue asi porque revisando los supuestos folds de esa funcion, no me aprece que esten en ese orden directo, osea el orden se ve si miramos los indices de lo que devuele la funcion en retunrtRAIN pero de esos campos cuales correpsonde a la parte del test, no es como un orden orden de verdad)teniendo en cuenta eso, ps los otros metodos son el meustro aleatorio, leave one out, y uno especial para las series de tiempo y preservar ese orden los codigos todos estarian en mi material personal
+
+
+### selecion de features:
+
+ahora si apra la selecion de features, es volver a a acher todo lo mismo, pero espficando ahora otra variable
+
+```{r}
+set.seed(17)
+modelos2 <- train(Binaria~SHAPE_LEN,data=training,method="glm",trControl=train.control)
+modelos2
+```
+```{r}
+set.seed(17)
+modelos3 <- train(Binaria~SHAPE_AREA+SHAPE_LEN,data=training,method="glm",trControl=train.control)
+modelos3
+```
+notece como la presicion del modelo utilzando solo la variable de longitud es con valizacion cruzada y todo de solo alredro del 70%, por lo que mirando solo esos dos modelos iniciales, se ve que es mas explciativa la area que la longitud del tipo de parque, y si miramos la agregacion de los dos, es aun mas precisa la prediccion del dato
+
+fijece que gracias a estos criterios, podriamos de cierta manera objetiva, decidir el porque la inclusion de tales features en el modeol, lo cual en comapracion a los modelos de regreion lineal es una ayuda, debido que en estos eteniamos en analisis de la varainza, para saber si incluiamos o no a otro predicor, aca ya cualqueir modelo como los arboles y estos, se puede pobrar directamente si icnluir o no otra variable
+
+cabe rsltar para este acso practico, que la alta presicion rtambein se puede deber a que es una muestra pequeña de datos, de hecho para la predicion de vraibles binarias, 1/2 elevado al tamaño de la muestra, nos da la probablidad de obtener un 100% de presicion, en este caso:
+
+```{r}
+(1/2)^length(training)
+```
+tenemos un 3.1% de probabilidad de que tenagmos 100% de presicion(aforutnamande no es tan alta y por ello el modelo puede ser bueno, aun asi no seria mal mas datos)
+
+#### recorderis de analisis exploratorio
+
+cabe resaltar que como hemos visto, para la seelecion de features, tambn se puede realizar mediante analisis exploratorios, y en este curso explican otras formas de hacer graficas que no se habian visto antes
+
+```{r}
+featurePlot(x=training[,c("SHAPE_LEN","SHAPE_AREA")],y=training$Binaria,plot="pairs") 
+```
+lo bueno de la grafica anterior es para poder graficar que varaibles versus cuales, como la similar a la base de R solo que esa bota todas con todas
+
+tambien muestran como a partir de la cuantitativa, podriamos inventarnos categorais al crear intervalos
+
+```{r}
+library(Hmisc)
+intervalos <- cut2(training$SHAPE_AREA,g=5)
+table(intervalos)
+```
+ya con lo anterior podriamos inventarnos que los priemros son de mas pobres, y los ultimos son de lujo, cosas asi
+
+```{r}
+prop.table(table(intervalos,training$TIPO),1)
+```
+basicmente con la funcioon anterior, se puede observar en proporciones por filas la cantidad de esos intervalos, por ejemplo el 11% de los parqques metropolitanos tiene un area entre 28170 y 56145
+
+buscando datos atipicos
+
+```{r}
+plot(training$SHAPE_LEN,training$SHAPE_AREA,col=training$TIPO)
+```
+en este caso, se ve que con las dos vraibles de cierta forma se ve el comprotamineto del tipo de parque, donde para unos el creicmeitno es muy alto y oara otros es muy bajo, en este caso, aca abaria el analsiis exploratior, debido a ser esta las unicas dos varialbes de interes, **si hubiesen mas variables, la idea de ir graficando esto, es mirar que si pdeornto graficamos por otra varaible, se ve algun comportamietno qeu solo se vio con esa varible u asi se sepa q esa vraible deberia incluirce al modelo por eso, donde se resalta que estas graficas simpre hacerce resepcto a la que se va a predecir Y con las variables, osea decir que pasa si grafico el tipo de parque versuis tal, el tipo de parque versus tal y asi.(aunque bueno esto ulitmo peude ser realtivo si buscamos como posibles correlaciones entre predicoptras que expliquen relaciones con la Y)**, tambien revisar **si hay muchos datos de algun tipo, por ejemplo lo que habiamos hablado antes de que el modelo esta mas dispeusto a predecir datos de parques zonales, es por la gran cnatidad de datos que de estos hay, por ello conlsuones como estas se hubiesen podio indetificar inicialemnte directamente con un analisis exploratorio de datos**
+
+histograma para revisar que tengan comprotaminetos mas gausianos o normales ...
+
+```{r}
+hist(training$SHAPE_AREA)
+```
+
+```{r}
+hist(training$SHAPE_LEN)
+```
+al revisar los dos histogramas anteriores, aplica directament lo que se nombra en el curso, y esque peude suceder que los algorimtos no funcione de la mejor manera si los datos no estan estandarizados, asi que mejor hacerlo, y se resalta que para el test set toca hacerlo tambien, pero con ls parametros del training set
+
+```{r}
+preObj <-preProcess(training[,c("SHAPE_LEN","SHAPE_AREA")],method=c("center","scale"))
+EstandarizadosTrainingShapeArea <- predict(preObj,training[,c("SHAPE_LEN","SHAPE_AREA")])$SHAPE_AREA
+EstandarizadosTestShapeArea <- predict(preObj,test[,c("SHAPE_LEN","SHAPE_AREA")])$SHAPE_AREA
+
+mean(EstandarizadosTrainingShapeArea)
+sd(EstandarizadosTrainingShapeArea)
+
+mean(EstandarizadosTestShapeArea )
+sd(EstandarizadosTestShapeArea )
+
+```
+en este caso tambien es encesario estandarizar el predictor de longitud(en el curso solo se le hacia el proceso a el feature que tenia esa caracteristica)
+
+```{r}
+EstandarizadosTrainingShapeLen <- predict(preObj,training[,c("SHAPE_LEN","SHAPE_AREA")])$SHAPE_LEN
+EstandarizadosTestShapeLen <- predict(preObj,test[,c("SHAPE_LEN","SHAPE_AREA")])$SHAPE_LEN
+
+plot(EstandarizadosTrainingShapeLen,EstandarizadosTrainingShapeArea,col=training$TIPO)
+```
+notece como exatmaente esta el mism ocomprotamieno de los datos, simpelmente la escala ahora es normalizada(aun asi si hacemos los hostrogamas sigue tneinedo ese comportmeinto ls datos, deronto ligeramente reducido).
+
+ese procesamiento es lom imso que restar el promedio y dividir pol a desviacion estandar, esto tambien se puede realizar direacmente la hacer el modelo
+
+```{r}
+modeloEstadarizado <- train(Binaria ~ SHAPE_AREA,data = training[-test1,],preProcess=c("center","scale"),method="glm")
+```
+si revisamos el anterior modelo, el cofiencite de la pendeite es muy similar al que ya habiamos claculado antes y el p valor es el mismo. este modeol bascuiamente esta haceidno la prediccion direcmtent con el vector de area ya estandarizado
+
+sucede que como vimos a pesar de la estandarizacion, no cambia mucho el modelo no los hsiotgramas, esto es porque los datos estan muy "profundos" en su forma, asi que por mas tratameitno que se haga no se podra cambiar mucho esto, ya que el pone el jemplo de que otro tipo de tratamiento es hacer quel os datos reales( en este caso area) se vean diracetmetn como datos normales esto se llama *procesamiento box cox*
+
+```{r}
+preObj <-preProcess(training[,c("SHAPE_LEN","SHAPE_AREA")],method=c("BoxCox"))
+BoxCoxTrainingShapeArea <- predict(preObj,training[,c("SHAPE_LEN","SHAPE_AREA")])$SHAPE_AREA
+BoxCoxTestShapeArea <- predict(preObj,test[,c("SHAPE_LEN","SHAPE_AREA")])$SHAPE_AREA
+hist(BoxCoxTrainingShapeArea)
+```
+aca parece lograrce mejor el comportamiento gausiano
+
+```{r}
+modeloBoxCox <- train(Binaria ~ SHAPE_AREA,data = training[-test1,],preProcess=c("BoxCox"),method="glm")
+prediccionBoxCox <- predict(modeloBoxCox,newdata=training[test1,])
+
+  
+  confusionMatrix(prediccionBoxCox,training[test1,]$Binaria)
+```
+fijece como al netrenar el modelo mediante la funcion train del paquiete caret, no es ncesaria la "trasnforamcion" de los valores de la regresion a 1 y 0, este yal oh ace autmatico y seo btiene le mismo resultado
+
+en esta parte del preProcesamiento, tambien esta la opcion del metodo de Knn vecino mas cercano, y es introducor en algun dato faltante el venicmno as cercano, paran uestro caso no se aplcia debioda q no tenemos valores faltantes, aun asi, este metodo sirve para predecir, asi que psioiblemente depsues lo trate
+
+#### Covariables
+
+en el curso, se habla del a creacion de covariables, lo cual puede darce en priemra media para de cierta forma *estructurar datos*m como el ejemplo que a partir de una imagen o texto, se escriban caracteiricas de estos con algun valor en columnas; otra aplciacion, es la que hemos realizado de la creacion de variables dummy, que simpelmente es asignarle el valor de 1 o 0 a las categorias(solo que ellos muestran como una funcon esepcifica para hacer eso pero am im egusta lo normal como lo hago), o agregar compoenntes plinomiales a los modelos lineales; tambien esta no la agregacon de varaibles, sino la eliminacion, como la eliminacion de quellas varaibles q no tienen varaibilidad(osea q son mas como cosntantes) como por ejemplo alguna vraible que tuviera este data set como un indicativo si tenia arboles(ausmioento q todos lso aprues feuran naturales ps esta "varaible" siempre tendira el valro de 1), o la "reduccion" de variables lo cual veremos mejor en la parte de PCA
+
+para la revsion de la varaibildiad se puede:
+
+```{r}
+nearZeroVar(training,saveMetrics = TRUE)
+```
+en este caso todas las varaibles en la parte de zeroVar dicen FALSE, lo cua india que todas muestra variabilidad y no deberian ser eliminadas del modelo(sin emabrgo oviamente el nombre peude q sea muy variable, pero ps en realdiad es como un ID de los datos q no aporta nada y se podria eliminar) y el otro aspecot es el procentaje de unicos donde cklaramente por jemplo para el nombre y area simepre tiene un valor difenrete entonces es 100% pero para el tipo o la bianrai q es lo mismo ps hay menos varaibildiad porq muchos registros son parque zonal y asi
+
+```{r}
+library(splines)
+BasesPolinomiales <- bs(training[-test1,]$SHAPE_LEN,df=3)
+head(BasesPolinomiales )
+```
+basicamente lo anterior es como una desocmpsicion polinomial en tres bases, a la 1, al cuadrado y cubica de la variable longitud(segumos haciendo todo en este trainign y test esepcificos, esto proq si lo hago con el traning puro ps para testear me tocaria con el test puro, pero aun no quiero tocar ese set)
+
+
+
+```{r}
+lm1 <- lm(training[-test1,]$SHAPE_AREA~BasesPolinomiales)
+plot(training[-test1,]$SHAPE_LEN,training[-test1,]$SHAPE_AREA,pch=19)
+points(training[-test1,]$SHAPE_LEN,predict(lm1,newdata=training[-test1,]),col="red",pch=19)
+```
+fijece como se obtiene serto suavizamiento a partir de la predcion de la longitud pero en su forma polinomial en base  cubica(sin embargo si revisamos los coeficientes, el unico significativo es la parte lineal o elevado a la 1)
+
+```{r}
+PolinomialesTest <- predict(BasesPolinomiales,SHAPE_LEN=training[test1,]$SHAPE_LEN)
+```
+el anterior serai el conunto a probar en el test set(es como de cierta forma predecir los predicotres del test set)
+
+el modelo anterio al ser cuantitativo se mdie es con el RMSE osea mriadno la distnacia de los valores predeciso resepcto a los reales 
+```{r}
+
+sqrt(sum((predict(lm1,newdata = PolinomialesTest)-training[-test1,]$SHAPE_AREA)^2))
+```
+REVISAR LO ANTERIOR CUAN OSE PA CALCUALR EL RMSE
+
+#### Principales componentes
+
+para la realzacion de los pirncipales compoentnes, incialmente se busca la correlacion entre las variables, donde aquellas las correalcionadas podrian reducirce a una sola variable explicando el mismo comportamiento, esto se busca principalemtne para reducir el ruido de los datos y el ejemplo que elos utilizan, es que de alguna forma "supieron" que la multiplciancion de ambas vraivbles porun pesso y su suma, era la nueva variable que explciaba las dos de mejor forma, realizar esta misma combinacion quen o cnesariamente es la suma entre 2 o mas variables es lo que se le llama los componentes principales. cABE TAMBIEN DESTACAR QUE UNA DE LAS RAZONES PARA RELAIZAR ESTO, ES LA LLAMADA MALDICION DE LA DIMESIONALIDAD, QUE DICE QUE AL AUMENTAR LAS VARAIBLES QUE SE USAN O DIMESIONES, LOS DATOS SE VUELVE MAS DISPERSOS, LO CUAL ES PROBELMATICO PARA CUALUEIRM ETODO QUE REQUIERA SINGIIFANCIA ESTADISTICA(lo cual lo necesitamos para hacer inferencias correctas)para mas informacion el wikipedia[maldicion de la dimensionalidad](https://es.wikipedia.org/wiki/Maldici%C3%B3n_de_la_dimensi%C3%B3n)
+
+debido la poca cantidad de variables del anterior data set, se decide descargar uno nuevo
+
+```{r}
+
+
+#UrlDelArchivo <- "https://datosabiertos.bogota.gov.co/dataset/9e4c5805-9257-4ecb-b4da-16f96c2f2820/resource/dddb967c-94a1-4f84-a7f4-59c6d64961d8/download/distribucion-poblacional-de-estudiantes-proyectos-de-formacion-ofb.csv"
+
+#download.file(UrlDelArchivo,destfile = "Lectura1.csv")
+datos2 <- read.csv("Lectura1.csv",sep=";")
+dim(datos2)
+```
+
+```{r}
+head(datos2)
+```
+
+
+
+```{r}
+cuantitativas <- datos2[,4:25]
+head(cuantitativas)
+
+```
+mirando los datos hay varias coulumnas que son todos ceros, por lo que siguiendo lo enseñado en el curso, estas se podrian eliminar
+
+```{r}
+apply(cuantitativas,2,sum)
+```
+```{r}
+cuantitativas <- cuantitativas[,-c(3,9,13,14,18,20,22)]
+head(cuantitativas)
+```
+
+```{r}
+Correlaciones <- cor(cuantitativas)
+diag(Correlaciones) <- 0 # se hace cero esta diagonal, porque si no cuando preguntemos lo siguiente, nos va a decir que la misma varible con la misma tiene toda esa correlacion
+which(Correlaciones>0.8,arr.ind=TRUE)
+```
+obseevando lo nateior, hay una correlacion dek mas del 80% entre las varaibles de infancia entre 7 y 13 años con mujeres(probablemente entre este rango de edad la mayor cantidad de personas son mujeres(lo cual no es raro, ya que se sabe que hay mas mujeres que hombres, (ademas personalmente en el colegio tambien en la mayoria de cursos siempre habia esta tendencia)), y tambien entre las varaibles de Desplazados y adolesencia entre 14 y 17 años, indicando que tristemente entre esta edad hay mas relacion con la situaicon de desplazado.
+
+**una ves identificado lo anterior, la idea de los princiaples componentes es decirnos, si estas dos variables estan tan correlacionadas, osea que posiblemente crezcan o descrezan del a misma forma, o en otras palabras tengan un compratmiento tan similar, que podamos con otra neuva varaible explciar esas dos de una vez, sin tener que utilizar las 2, una idea posdria ser usar la suma, otra la resta, alguna multiplciacion cosas asi, AHI ES DONDE ENTAN LOS COMPONENTES PORNCIPALES, estos seran esa combinacion que nos permitira explciar de la mejor forma el comprotmaeinto de las dos varaibles en una sola**
+
+en el curso, ellos de cierta forma "sabian" cual era la combinacion que explicaba la mejor relacion(era la suma), y la comaparban con otra forma de combinacion que era la resta, y observaban que al graficar los rsultados que daria la suma en el eje x, y los resutlados de la resta en el eje Y, veian que gran cantidad de datos se aglomeraban en un rngo de X, indicando que la suma(q era el eje x) era la que lograba explciar ese comprotamiento de las dos varaibles, y no la resta(ya que en el eje Y no se veia ese comportamiento) basicamnte esa grafica era lo mismo que la grafica del principalcomponente en el eje x versus el segundo pirncipal componente en el eje Y ; para nseutor acso tal grafica seria:(para el caso de mujeres y infancia entre 7 y 13 años(ya que tiene 89% de correlacion, la otra tiene 82%))(cabe resitlar que la "suma" y "resta" del ejemplo anetiro enrealdiad eran ponderadas, osea multiplciadas por unos pesos o porcentajes(por lo que ellos ya sabian que eran los componentes principales))
+
+```{r}
+GraficaPCA <- cuantitativas[,c("Mujeres","Infancia..7.a.13.años.")]
+PrincipalesCompoentesParaEsasDos <- prcomp(GraficaPCA,scale = T)
+plot(PrincipalesCompoentesParaEsasDos$x[,1],PrincipalesCompoentesParaEsasDos$x[,2],xlab="componente principal 1",ylab = "componente principal 2")#notece que con x accedemos a los componentes principales(osea la variable rsultante como quedaria, oseal combinacion de las dos oficiales como queda)
+```
+fijece como de la naterior grafica, efecitgavment pasa algo similar que en el caso del curso, si miramos el resultado del componete principal 1(valores eje x), entre los valores por detras de cero(alguna resta o algo que dio como resultado valores negativos entre las dos variables), miramos que es detras de ese valor que se aglomeran la mayor cantidad de datos, y si miramos el eje y, no se logra ver tal comportamiento solo una ligera dispersion entre algunos resultados; teniendo en cuenta lo anterior, cual fue la ecuacion que se uso para lograr obtener tales valores, o tal combinacion?, para ello accedemos a la matriz de rotacion que nos da es esos pesos por los que se multiplican las varaibles originales para obtener el compkente principal
+
+```{r}
+PrincipalesCompoentesParaEsasDos$rotation
+```
+basicamente la nueva variable que graficamos antes en el eje x, es 0.64 por el valor de mujeres respectivo mas 0.76 por el valor de infacia entre 7 y 13 años EN ALGUNA COMBINACION, ose anoncesriamente tiene que ser una suma entre los valores puede ser alguna operacion mas compleja, por lo que por ello es que una de las desventajas de esto es que reduce la interpretabilidad; **sin embargo si deseamos que efectivamente sea exacamente la suma, es necesario ESTANDAZRIZAR ANTES LOS DATOS, y veremos que el primer valor del compoennte principal, es exactamente igual a el primer valor del dato de mujeres ESTANDARIZADO, por el valor del "peso" estandarizado del PC1 de mujeres mas el valor original del dato de infacia entre 13 y 17 años ESTANDARIZADO, por el "peso" de esa varaible de mla matriz de rotacion del PC1 estandarizado.**
+
+cabe resaltar que tales "pesos" de la matriz de rotacion anteriores, son los mismos que se obtiene por el metodo o descompósicopn SVD, con los vectores singualres derechos(donde el PC1 es le mismo primervector singudar derecho, eñ segundo sera el segundo PCA y asi), por lo que esto ya nos da un indicativo de como es la combinacion que se realizo para obtener los pronciaples compoenntes, ya qeu como sabemos, esos vectores singuales derechso (o primnciaples compoenntes) es una de las matrices (en total son 3) con las cuaels se descomponene los datos reales, osea que con esos pesos, se puede realizar algun tipo de multiplicacion dem atrices o algo por el estiolo para obtener los componentes principales que tenmos y cabe resltar qeu en otro curso que relice, decian que se podian como itnerpretar o intentar entender a estos compoentes como otra posible variabgle con sentido, por ejemplo apra este caso entre mujeres y infancia entre 7 y 13 años podria ser proporcion de mujeres respecrto a hombres en ese rango de edad, algo asi podria ser(aunq en ese curso si decian que llegar a definir eso era complejo).**de la misma forma que antes solo veremos que se exactamente los mismos valors del metodo del svd y del pca si efectivamente son estnadarizados los datos antes, osea puede que la combinacion de la multiplcaicon dem atrices del SVD no se la misma que hace el de prmncipales compentes si los datos no estan estandarizadso(efectiavmente lo comprobe sin estandariza y no dan los mismos valores)**
+
+
+**NOTA: LO anterior esta escrito como si hubese dejado los valores sin haber escalado los componentes principales, decidi dejarlo escalado para poder comaprar, el metodo de SVD para la obtencion de la varaibilidad explciada por los cmpoentes, con el metodo anterior del PCA, donde lo interesante es que en priemra medida en el curso solo me explciaron lo de la varibilidad  con el SVD en el otreo curso, y sucede que he trabajo tambn con otras formas de obtener esa varibildiad aparitr del PCA, donde dos formas, es 1 apartir de la desvaicon estandar de los componentes se obtiene exactamente la misma vraibldiad del SVD(que se obtiene es con la diagonal de este metodo) y otra forma es con elcalculo de algo llamado valoers propios que sirven para obtener la misma varaibilidad pero dem manera aproximada**
+
+
+
+```{r}
+svd2 <- svd(scale(GraficaPCA ))#metodo SVD
+svd2$v #note la misma matris de rotacion del pCA
+```
+```{r}
+plot(((((svd2$d)^2))/sum(((svd2$d)^2))), xlab = "Valor singular", ylab = "Varianza explicada", pch = 19)
+```
+con el metodo del svd, se encuentra que el primer comopoennte princial explica alrededor de mas del 90% del a varianza explicada y el otro el resto, valores exactos:
+
+```{r}
+(((svd2$d)^2))/sum(((svd2$d)^2))
+```
+con la desviacion estandar del PCA
+
+```{r}
+prop_varianza <-PrincipalesCompoentesParaEsasDos$sdev^2 / sum(PrincipalesCompoentesParaEsasDos$sdev^2)
+prop_varianza
+```
+grafica como chevere de lo anterior:
+
+```{r}
+library(ggplot2)
+prop_varianza_acum=cumsum(prop_varianza)
+ggplot(data = data.frame(prop_varianza_acum, pc = 1:2),
+       aes(x = pc, y = prop_varianza_acum, group = 1)) +
+  geom_point() +
+  geom_line() +
+  labs(x = "Componente principal",
+       y = "Prop. varianza explicada acumulada")+geom_hline(yintercept=0.95,col=2)
+```
+la anterior grafica se ve mejor cuando hay mas componentes, y simplemente es la grafica de las varianzas explciadas en comparacion a alguna linea, mostrando que tienen mas menos de tanta variacion
+
+con calculo de valores propios(aproximacion)
+
+```{r}
+library("factoextra")
+fviz_eig(PrincipalesCompoentesParaEsasDos,choice = "eigenvalue", addlabels = TRUE, axes = 1,ylim = c(0,5))
+```
+```{r}
+c(1.9/(1.9+0.1),0.1/(1.9+0.1))
+```
+```{r}
+fviz_pca_var(PrincipalesCompoentesParaEsasDos, col.var = "cos2", 
+             geom.var = c("arrow", "text"), 
+             labelsize = 2, 
+             repel = FALSE)
+```
+
+la anterior grafica tambien se veria mejor con mas variables(probablemente haga otra con mas variables para despues hacer el modelo, cabe rstlar que en estem omento solo use 2 para mostrar lo del curso, ademas al tener esas tanta correlacion es que el pirncipal componente sale tan capo ) y esta grafica permite mirar que variables son como las de mas peso para el componente principal, donde las que esten con azul mas clarito es que son mas imporntates para el PC1
+
+```{r}
+fviz_pca_biplot(PrincipalesCompoentesParaEsasDos)
+```
+la anterior grafica, es basicamente la misma que nosotos hicimos de unos versus otros, lo interesante de esta es motrar el "dato" original sobre el punto del PCA, en este caso por ejemplo el numero 56 indica el colegio 56, mostrando que de cierta forma  es como el dato mas atipico, osea tendra la matyor cantidad de mujeres o cosas asi, se podrian internatr ver esto mas claro nombrando las filas de los datos:
+
+```{r}
+rownames(GraficaPCA) <- datos2$Punto.de.atención
+PrincipalesCompoentesParaEsasDos <- prcomp(GraficaPCA,scale = T)
+fviz_pca_biplot(PrincipalesCompoentesParaEsasDos)
+```
+de la naterior grafica, se ve que el colegio liceo femenino mercedez nariño es el mas separado de los otros datos, lo cual en priemra medida no es de extrañaer debido a ser solo femenino y por su tamaño posiblemente(notece como gracias al analisis de datos, nunca hable de nisiquiera si eran colegios o no, y como se llego a conocerce uno mediante lo realizado de PCA)
+
+NOTa: intente hcaer la ianterior grafica como por el nombre del la localidad, pero nos epuede porque R pide un unico indetificador para cada fila, para eso depronto serivira mas un anlsiis de clusters o cosas asi
+
+
+#### aplicacion al modelo
+
+para la aplicacion al modelo del PCA, utilizare el ultimo data set debido a la diversidad de variables, para ello primero me quedo con las variables que habimoas visto como mejores para antes y divido en training y test
+
+```{r}
+head(datos2)
+```
+```{r}
+DeInteres1 <- datos2[,c(2,4:25)]
+head(DeInteres1)
+```
+```{r}
+DeInteres2 <-  DeInteres1[,-c(4,10,14,15,19,21,23)]
+head(DeInteres2 )
+```
+
+```{r}
+DeInteres2$Nombre_Localidad <- as.factor(DeInteres2$Nombre_Localidad)
+DeInteres2$Separador <-  rbinom(length(DeInteres2$Nombre_Localidad),1,0.5)
+set.seed(17)
+
+inTrain2 <-createDataPartition(y=DeInteres2$Separador,p=0.75,list=FALSE)
+training2 <- DeInteres2[inTrain2,]
+test2 <- DeInteres2[-inTrain2,]
+
+training2 <- training2[,-17]
+test2 <- test2[,-17]
+
+```
+
+**NOta: acontinaucion dejo el codigo para una regresion multinomial que no se vio en el curso, a mi me parece interesante, aun asi el modelo que dio es muy malo, deponto muchas categorias no se, pero peude llegar a servir en otro caso**
+
+```{r}
+#library(nnet)
+#library(MASS)
+#modeloX <-  multinom(Nombre_Localidad ~ .,data = training2)
+#confusionMatrix(predict(modeloX,newdata=test2),test2$Nombre_Localidad) 
+```
+
+
+```{r}
+training2 <- training2[,-1]#le quito la categoria que ya no interesa
+test2 <- test2[,-1]
+```
+
+Para la realizacion del modelo, usando como predictores los compoenntes principales, se debe elegir antes cuantos componentes principales utilizar como regresores, ya qeu si hasta con uno solo se puede hacer el modelo, mucho mejor, asi que el el curso se muestra que la funcion de caret automarticamente detemrina cuantos utilizar, sin emabrgo tambien se peude realizar de maenra logica a partir de la vrainza explciada de los componetes
+
+antes de la realizacion del Metodo, voy a eliminar aquellas variables que yas abemos que pdorian ser hasta consideras constnates debido a su poca vraibilidad, esto lo hago porque  especialmente en la ultima parte cuando se aplcia directamente el preprocedsamiento en la funcion train de caret, este detecta esas vraibles con varianza cercana a cero y hace que se obtengan resutlados ligretamente diferentes al metodo "manual" que ps no detecta eso y uno saca los compnentesp rinciapels sin darce cuenta de eso
+
+```{r}
+nearZeroVar(training2,saveMetrics = TRUE)
+```
+puede que con lo anteior la varaible de adultez entre 27 y 50 años no alcance a pasar lo de zeroVar, sin emabargo , como deica en la fucnion train saca la alerta, aun asi la eliminar debido a que realmente oslo tiene 2 valores diferentes al resto de registros
+
+```{r}
+training2 <- training2[,-7]#le quito la categoria que ya no interesa
+test2 <- test2[,-7]
+```
+
+
+
+```{r}
+PCA2 <- prcomp(log10(training2[,-1]+1),scale = T)# lo voy a dejar estandarizado debido, debido a las coherencias de antes explicadas, pero en el curso no le hacen eso; la priemra columna no la usop orque opredecire el numero de hombres, le sumamos 1 porque hay varios valores de 0 que el ligarimto no los tendira en cuenta, y lse hacemos lo de lograritmo para qeu se vean mas normales
+
+prop_varianza2 <-PCA2$sdev^2 / sum(PCA2$sdev^2)
+prop_varianza2_acum=cumsum(prop_varianza2)
+
+
+ggplot(data = data.frame(prop_varianza2_acum, pc = 1:13),
+       aes(x = pc, y = prop_varianza2_acum, group = 1)) +
+  geom_point() +
+  geom_line() +
+  labs(x = "Componente principal",
+       y = "Prop. varianza explicada acumulada")+geom_hline(yintercept=0.8,col=2)
+```
+como podemos observar en la grafica anterior, con alrededor de 5 componentes principales se logra explicar un 80% de la variacion de los datos,y obviamnte con 13 componetes el 100%(13 son todas las variables) osea que es razonable utilizar 5 componetes o dimensiones para explicar 13, deucindo asi la dimensionalidad y disminuyebndo los efectos de la maldicion de la dimensionalidad
+
+
+```{r}
+preObj2 <- preProcess(log10(training2[,-1]+1),method = "pca")# con el argumento pcaComp se puede espeficifar el numero de componentes principales a utilizar, en este caso al no ponder nada, da exacamtnen el mismo resultado de componetnes de la anterior funcion
+PCA2OtroMetodo <- predict(preObj2,log10(training2[,-1]+1))# aca es como si con el anteriopr objeto de pre procesamiento, se "predijera" o simplemente se reemplzace en la formula del principal componente(los pesos por los valores y la suma al estar estandarizado) los valores reales, osae calcular los poicnripales compoentnes, en el metodo anterior, esots se calculaban directamente
+
+#nota, esta forma, tambien clacula un numero espeficio de PCAs parece ser la mejor cantidad tambien
+```
+si graficamos los resutlados del anterior metodo de la manera `plot(PCA2OtroMetodo[,1],PCA2OtroMetodo[,2])` se obtenidra la misma grafica qeu accdeiendo al objeto x del anteior metodo como ya hemos echo antes
+
+```{r}
+RegresoresPcs <- as.data.frame(PCA2$x)
+RegresoresPcs <- cbind(RegresoresPcs,training2$Hombres)
+
+
+ModeloPca2 <- train(`training2$Hombres`~ PC1+PC2+PC3+PC4+PC5+PC5,method="lm",data=RegresoresPcs)#parece q cogiera el vector de training(q no estaria mal) pero enrealidad asi quedo el nombre del data frame
+
+test2Pcs <- predict(PCA2,log10(test2[,-1]+1))
+test2Pcs <- as.data.frame(test2Pcs)
+test2Pcs <- cbind(test2Pcs,test2$Hombres)
+
+sqrt(sum((predict(ModeloPca2,newdata = test2Pcs)-test2Pcs$`test2$Hombres`)^2))# no importa que se le pase todo el data set con todos los pcas, el solo predice los pca que tenga el modelo
+```
+como es numerico tenemos un nivel de error cuadratico medio de 361.7856 cantidad de hombres respecto nuetro modelo a los datos de prueba
+
+```{r}
+ModeloCaret <- train(Hombres ~.,method="lm",preProcess="pca",data=training2)
+sqrt(sum((predict(ModeloCaret ,newdata = test2)-test2$Hombres)^2))
+```
+con el metodo "directo" de poner el argumetno de preprocesamiento con PCA se obtiene un menor error cuadratico medio, son emabnrgo si ponemos con el anteior metodo el uso de 6 componentes principales, se obntien practicamente el mismo resultado
+
+```{r}
+ModeloPca2 <- train(`training2$Hombres`~ PC1+PC2+PC3+PC4+PC5+PC5+PC6,method="lm",data=RegresoresPcs)
+sqrt(sum((predict(ModeloPca2,newdata = test2Pcs)-test2Pcs$`test2$Hombres`)^2))
+```
+por lo que con lop anterior se puede decir que probablemente el uso de 6 componentes princiaples es adecuado para el modelo(si revisamos la variabilidad, estos explcian coomo un 88% del os datos originales, osea q con solo 6 dimensioens se puede expliciar las 13 originales), esto nos podria dar cierto inidcativo de que depronot esta funcion decaret mira si la vraiblidad eplxida es mayor de un 85%(parece logico) y por eso esocge larededor de los 6 compopnentes(sin emabrgo esto queda a experimentacion psoterior, por lo uqe relamente no se bien que metodo excamto hara esa funcion por debajo)
+
+```{r}
+preObj22 <- preProcess(log10(training2[,-1]+1),method = "pca",pcaComp = 6)
+PCA2OtroMetodo2 <- predict(preObj22,log10(training2[,-1]+1))
+PCA2OtroMetodo2$Hombres <-  training2$Hombres
+
+test2Pcs2 <- predict(preObj22,log10(test2[,-1]+1))
+test2Pcs2 <- as.data.frame(test2Pcs2)
+test2Pcs2 <- cbind(test2Pcs2,test2$Hombres)
+
+
+ModeloPca3 <- train(Hombres~ .,method="lm",data=PCA2OtroMetodo2)
+
+sqrt(sum((predict(ModeloPca3 ,newdata = test2Pcs2)-test2Pcs2$`test2$Hombres`)^2))
+```
+efectivamente con el "metodo" anterior da el mismo resutlado de la funcion directa de caret, osea QUE *EFECITVAMETNE CARET USO 6 COMPONENTES PRINCIPALES**
+
+NOTA: en esta parte del PCA, a parte de las interpretaciones anterioemnte dadas, en cuanto la caso practi se concluye que mediante la funcion train de carert se peude obtener direcemtne la cantidad de compopnentes princiaples "optimos" para el modeo que epxlcian la cantidad adecuada de variabilidad, no sabemos exacmatne bajo que criterio escoge los 6, pero ajustandoce al de varaiblidad que expuse antes, pdoria serq ue bsuco estos 6 porque cumplican con mas del 85% de la vraibldiad de los datos, sin emabrgo esto queda a experiometnacion de saber bvien como funciona tal funcion, para hacer los coidgos practicos, aparte de pasarlo en lal iena de codigo y ya, se puede ahcer con la funcoon preprocces que entrega examtnae el mismo resutlado, solo que esta hay q espefiicarle cuantos PCA a utilizar, y un metodo peude ser con el de lavaribilidad, con la otra funcon base del paeute de R tambien se obtiene casi ecamten el mismo modelo.
+
+#### residuales 
+
+como ya vimsop en el anterior curso, se hablo de los puntos atiopicos y como estos resepcto a la regreisom linel gegernabn cierto "momento" o palanca que hcain q  elm odo cambiara mucho, ahora tambn se nomrba que para el resto dem odeols tambine ueden traer problemas, en este caso, solo rslto una forma de graicar la clasica grafica de resiudaels versis ajustados pero coloreando los puntos
+
+```{r}
+plot(ModeloPca3$finalModel,1,col="#00000010")
+```
+la anterio grafica se nalizaria igual q en el curso anterior, aca la idea era mostrar como los coolres  que se concentran mas en algunos lados pero aca no se dio excacmante lo mismo al curso
+
+tambien muestran la idea de colorear los residuales por alguna otra variable
+
+```{r}
+ModeloOtro <-train(Hombres~ Mujeres+Infancia..7.a.13.años.+Adolescencia..14..17.años.,method="lm",data=datos2)
+COlores <- ModeloOtro$finalModel
+
+qplot(COlores$fitted,COlores$residuals,colour=Nombre_Localidad,data = datos2)
+```
+la idea de la anterior grafica, es comparar los residuales con los valores ajustados, coloreando respecto alguna otra variable q no se agrego al modelo, esto con la intencion de revisar, si deprotno los outliers se estan dando especificamente por esta variable, en este caso seria preguntarnos si los datos de bien arriba puede que sean todos de una misma localidad, en este caso realmente no parece que esta variable pueda explciarlos(para agregar varaibles al modelo ya hemos hablado basnten emtre estos dos cursos)
+
+```{r}
+plot(COlores$fitted,pch=19)
+```
+tambien se nombra que intentar graficar los reioduales por indice, para revisar si hay algun comoprotmaiento creciente, de algo de tendencias o algo asi, donde si se daba queria decir que faltaba incluir en el modelo alguna otra varaible que ba creciendo, como el tiempo, o edad; en este mod rapido que se creo apra ejemplificar, no parece haber ningun patron de crecimiento
+
+**la ultiam como grafica que ellos hacen es la de graficar los valores predcidos en el conjunto de prueba versus ps el valor "real" del cjunto de prueba(osea con ls q se mide el error RMSE) y colorear tal grafica por alguna otra variable Y SE DEJA MUY CLARO QUE ESTO SE HARIA SOLO COMO CON FINES DEL ULITMO ANALISIS PARA INDICAR QUE ALGO FALTO DE HACER, PERO NO SE PEUDE MODFICAR EL MODELO INICIAL POR QUE PS ESTARIMOS USANDO EL COJUNTO DE PRUEBA COMO DE CIERTA FORMA ENTENAR EL MODELO.**
+
+
+### Modelos
+
+Para realizar la seleecion del mejor modelo, lo primero es realizar los diferentes modeols que se vieron en el curso
+
+#### Arboles
+
+SE RESALTA QUE SIRVE PARA MODELOS NO LINEALES Y NO ES MUY NECESARIA EL PREPORCESAMIENTO ANTEIROR DE PCA(DE HECHO EN EL PROEYCTO DEL CURSO, me daba mejor clasiicador hacerlo con los datos directos que con pca)(esto puede ser poeq si se manteien el cmportmaeinto de los datos, ps asi el valor de las columnas se transforme(por ejemplo a un PCA), emntonces se seguira manteniedo la clasfiicadonc de q si ese valor es mejor a tal esntonces sera tal clasificacion), DESVENTAJAS: PUEDE HACER SOBREAJUSTE,(EN EL CURSO NOMBRAN TAMBN Q NO SE PUEDE MEDIR LA INCERTIDUMBRE CON ESTE(RECORDAR Q CON LOS LINEALSE ASIAMOS INTEVLOS DE CONFIANZA Y Q TALES), Y QUE)
+
+EL modelo de arboles, a grandes rasgos es simplemente de manera “atuomatizada” hacer esa priemra calsifiacion “manual” que se ejemplifico pero de manera mas seria, osea es lo de revisar alguna variable y decidir mediante CONDICIONALES que si esta por debajo o encima de un valor entonces se predecira o pertenecerá a algún grupo
+
+Basicemtne a diferencia de ese proceso “manual”, en ese caso, el alogirtmo idenfitica cual de todas las varibles que tenemos, es con la que se puede hacer mejor esa separación de datos o grupos(esta separación se hace por el valor de la varaible preedecida Y) una ves hace eso, hace una división de los datos por ese valor de esa variable, y despeus en cada uno de los dos grupos vuelve a revisar cual variable es la q mejor separa los datos de Y y vuelve a separar y pro eso se le conoce como arboles, esto lo realizara hasta que el resutlado o esas clasificaicones sean lo suficientemente “puras” o los grupos muy pequeños
+
+esta seleccion "optima" de donde dividir las ramas, depende de la "pureza", hasta q la puereza sea la mayor, se dejan de hcaer ramas, la puerza la va midiendo con diferentes indicadores como el indice de GINI,la ganancia de informacion y la cantidad de clasificados incorrectamente y todos esos indices se caluclan en base a la probaiblidad de encontrar cada clase en cada rama, la idea de todos estos indidces es q tenga un valor de 0
+
+```{r}
+Arbol <- train(Binaria ~SHAPE_AREA+SHAPE_LEN,method="rpart",data=training)
+print(Arbol$finalModel)
+```
+con lo anterior se obtienen las "ramas" q el arbol hizo, en este caso, selecciono el area como la variable a mirar como punto de inflexion, y encontro que en el area de 81532.42 metros cuadrados si el area de algun parque es mayor o igual a este valor, sera clasificado como parque metropolitano, de lo contrario sera clasificado como parque zonal
+
+```{r}
+plot(Arbol$finalModel,uniform=TRUE,main="arbol de clasificacion")
+text(Arbol$finalModel,use.n=TRUE,all=TRUE,cex=0.8)
+```
+el arbol anterior es la forma "base" de ahcer el arbol, basciamente arriba solo dice que so shaope area es mayor o igual a el valor que habiamos dicho, entonces se ira por la rama izquierda de 0,de lo contrario por la rama derecha de 1
+
+```{r}
+library(rattle)
+fancyRpartPlot(Arbol$finalModel)
+```
+lo anterior es ma forma "linda" de hacer el arbol, caber stalr q este paweute rattle sirve mucho para hacer muchas de las cosas que hemos hecho con una interfaz mas "humana"
+
+```{r}
+ArbolPrediccion <- predict(Arbol,newdata = test)
+confusionMatrix(ArbolPrediccion ,test$Binaria)
+```
+Se obtiene una presicion del 88%(no lo comparo con la regreson logistica de antes porq esa solo era para ejemplificar la cross validation)
+
+
+```{r}
+PredecidosCorrectos <- ArbolPrediccion ==test$Binaria
+qplot(SHAPE_AREA,SHAPE_LEN,colour=PredecidosCorrectos,data=test,main="predecidos correctos de arbol de clasficiacion")
+```
+en el curso hacen la anterior grafica, que ya se podria hacer con cualquier tipo de clasificador discreto, para simpleente en priemra medida observar de maenra grafica el resultado, y en segunda para itnentar mirar de cierta forma como esta fallando el casificador, digamos que aca podria ser un dato como atipico el que esta clasificando ams mal que tiene como mucha longitud pero tampoco tanta area.
+
+```{r}
+library(rpart)
+ArbolC <- rpart(formula = Hombres ~ .,data= training2)#se peude espficiar el metodo como anova para decir q es de regresion, pero cre oq  no es necesario
+ArbolC
+```
+Aca de una vez hago el caso de arbol pero para datos continuos(este relaemtne no esp rofundizado en el curso), la diferencia es q lo realizo con ep propio paquete de `rpart`, esto para qeivtar problemas, ya que lo hice con el de carert y me salia una advertencia y basicmetne los resutlados diferncia en que el rsutlado de caret le faltabn alfgyans ramas mas especuificas, en este caso cabe resaltar que el arbol de regresion funciona de manera muy similar al de clasfiicacion, solo que en este caso 
+
+```{r}
+fancyRpartPlot(ArbolC)
+```
+```{r}
+ArbolCPrediccion <- predict(ArbolC,newdata = test2)
+sqrt(sum((ArbolCPrediccion-test2$Hombres)^2))
+```
+Basicamente el arbol de regresion lo q hace, es que va "partiendo" el espacio de dimensiones por cotas, y fijece q va dando un valor FIJO de la variable continua predecia(por lo q a mi personalmente no me gusta mucho, me gusta mejor la regresion lineal q ofrece examente un valor predecido para cada vañpr continua de la otra variable, osea este me parece q dejando eso fijo no es muy bueno, por lo q los datos son mas variables, por esa misma razon es que los mdoelos anteriores daban menor error cuadratico medio)
+
+#### bagging o boosttrap agregado
+
+basicamente este no es realmente un modelo, sino que es como un enfoque o metodo de "promediar" varios modelos del mismo tipo para obtener una mejor prediccion, el prceoso consiste a grandes rasgos en sacar un nuemro detemrinando de muestras con reemplzamiento a los cuaels se les ajsuta el modelo que se trate(arboles, regresionles lineales...) y se hace la prediccion en algun conjunto fijo apra todos los modelos entrenados y con eso se saca como un promedio de la preddcion, en R se mseutra ese proceso de cierta forma mnanual, pero no lo aplico porq no estoy seguro de algunas cosas, sin meabnrgo tambn mobran q de manera comun, se puede cambiar el metodo en caret para hacer los modelos con ese enfoque, pero tambn que con la fucinon bag se puede hacer para cualwueir modelo especifico
+
+```{r}
+set.seed(17)
+predictores <- training2[,-1]
+Apredecir <- training2$Hombres
+ArbolesBag <- bag(predictores,Apredecir,B=10,
+                    bagControl=bagControl(fit=ctreeBag$fit,
+                               predict = ctreeBag$pred,
+                               aggregate = ctreeBag$aggregate)
+                    )
+
+```
+del condigo anterior, en la parte de la B le decimso q 10 muestras(osea q hizo 10 modelos, o 10 arboles y de alguna forma se pormedian esos 10 para sacar una ultima predccion promediada(no un modelo como otro arbol, por eloo no se peude graficar como un arbol final, se peude es graficar cada arbol q saco)), en este caso se hizo el de arboles(por lo q fue el msotrado en el curso, pero en toda la parte de bag control se le puede espcificar el metodo q se quiera, de hecho, si revisamos `?bagControl` salen varios como ldaBag, para lineal discriminante y mas...
+
+```{r}
+# ArbolesBag$fits #asi se obtienen todos los arboles q hizo
+ArbolBagPrediccion <- predict(ArbolesBag,newdata = test2[,-1])
+sqrt(sum((ArbolBagPrediccion-test2$Hombres)^2))
+```
+fijece que el error se logra disminuire ncierta forma
+
+Con caret tambien se puede hacer lo mismo, solo que el define el numero de arboles de acuerdo a el(relaemtne no se)
+
+```{r}
+set.seed(17)
+ArbolBagCaret <- train(Hombres~.,method="treebag",data=training2)
+ArbolBagPrediccionCaret <- predict(ArbolBagCaret,newdata = test2)
+sqrt(sum((ArbolBagPrediccionCaret-test2$Hombres)^2))
+```
+fijece q se obtiene mejor resultado por el metodo de la funcion `bag`
+
+cabe restlar q para el codigo anterior fue neceasro isntalar el paquete `party`(no recuerdo si fue pal caret o pa la funcion bag)
+
+dado que desde un inicio no le he puesto muhca confianza a estos arboles para los datos continuos, me gustaria comaparar el bagging con el metodo deregreison lineal clasico 
+```{r}
+Lineal <- train(Hombres~.,method="lm",data=training2)
+LinealPrediccion <- predict(Lineal,newdata = test2)
+sqrt(sum((LinealPrediccion -test2$Hombres)^2))
+```
+fiejce como el metodo de regresion lineal parece muy bueno(aunq tendiramos q sondierar todos los supuestos y eso...)
+
+HACER UN BAGGINF PARA EL DE CASLFICIACION:
+
+```{r}
+set.seed(17)
+predictores <- training[,c("SHAPE_AREA","SHAPE_LEN")]
+Apredecir <- training$Binaria
+ArbolesBagClasificacion <- bag(predictores,Apredecir,B=10,
+                    bagControl=bagControl(fit=ctreeBag$fit,
+                               predict = ctreeBag$pred,
+                               aggregate = ctreeBag$aggregate)
+                    )
+
+ArbolBagClasificaconPrediccion <- predict(ArbolesBagClasificacion,newdata = test[,c("SHAPE_AREA","SHAPE_LEN")])
+confusionMatrix(ArbolBagClasificaconPrediccion ,test$Binaria)
+```
+fijece como para el caso de lasficiacion, subio de un 88% a un 92%
+
+#### Bosque aleatorio
+
+Es practicamnte un boostrap de arboles, en el que se hacen varios arboles y se promedia de alguna forma para obtener la mejor predicción, solo que esta vez los arboles no cogen todas las variables como un árbol sencillo sino q de manera aleatorioa cojen un subconjunto de variables logrando asi agregar mas diversidad al modelo; se nombra la improtnacia de hcaer validacion cruzada con este modelo, debido a que peude llevar a sobreajuste y es dificil saber cual de todos los arboles podria llevar a ese sobreajuste
+
+```{r}
+set.seed(17)
+BosqueAleatorioSinCv <- train(Hombres ~ ., data=training2,method="rf")
+BosqueAleatorioSinCvPrediccion <- predict(BosqueAleatorioSinCv,newdata = test2)
+sqrt(sum((BosqueAleatorioSinCvPrediccion-test2$Hombres)^2))
+```
+Aca decidi aplicar el bosque aleatorio directamente a la regreson y no al de lcasificaicon porque con lacasificacion basicamwente obtuve el mismo resultado que obtenia con boostrap asi fuera con validacion cruzada o no, asi fuera con el paquete especial o con caret
+
+sin emabrgo fijece que con ramdom Forest a diferencia del boostrap si se obteine una metrica muchisimo mejor(hasta mejor a la que se hizo con principales componentes)
+
+```{r}
+library(randomForest)
+getTree(BosqueAleatorioSinCv$finalModel,k=2)
+```
+con esa funcion anterior, se logra acceder a un arbol especifico, donde por ejemplo la columan de split var indica qrespecto a que varaible se dividio las ramas en este caso fue la 4(adolesencia entre 14 y 17 años sin contar hombres), el punto de divisdion de esa variable es 70 y la prediccion de hombres sera 194.913043
+
+
+```{r}
+set.seed(17)
+RfConCv <- train(Hombres ~ ., data=training2,method="rf",trControl=train.control,prox=TRUE)
+sqrt(sum((predict(RfConCv,test2)-test2$Hombres)^2))
+```
+fijece que realizando la validacion cruzada se obtiene una medida de error similar pero un poco mas grande, para asi evitar cualqueir tipo de sobreajutes que pueda dar el modelo.
+
+```{r}
+sisi <- train(Binaria ~ SHAPE_AREA+SHAPE_LEN, data=training,method="rf",prox=TRUE) 
+catuu <- classCenter(training[,c("SHAPE_AREA","SHAPE_LEN")],training$Binaria,sisi$finalModel$prox)
+catuu <- as.data.frame(catuu);catuu$Binaria <- rownames(catuu)
+p <- qplot(SHAPE_AREA,SHAPE_LEN,col=Binaria,data=training)
+p+geom_point(aes(x=SHAPE_AREA,y=SHAPE_LEN,col=Binaria),size=5,shape=4,data=catuu)
+```
+LO anterior es para el caso del randomFOrest de  clasficacion(que daba lo mismo que el boostrap y por eso no lo detalle)una grafica que los "centros" que se obtienen por el modeol, donde se observa que cierta forma si le esta "atinando" al centro de cada tipo de dato, si hubiesen mas regresoras se podria graficar de a par de variables y observar el centro entre esas variables
+
+```{r}
+set.seed(17)
+sqrt(rfcv(training2[,-1],training2$Hombres,cv.fold = 3,step=0.7)$error.cv)
+```
+con la funcion anterior, se puede saber el RMSE, que se obtendria si se usan las cantidades de varaibles que se tienen en un randomforest, en este caso en general a mendai que hay menos predicotras el error aumenta, pero la idea es revisar cual aumento no es tan alto, por ejemplo fijece que de 13 a 6 variables el error no es muy alto que suba y si se logran disminuir 7 variables
+
+```{r}
+RfConCvPuro <- randomForest(Hombres ~ ., data=training2,method="rf")
+importance(RfConCvPuro)
+```
+notece que realemnte al funcion no nos dice cuales varialbes escoger, sin emabrgo lei en internet y decian que el obejtov de la funcin era como cuando uno tenia unas 900 variables o algo asi, saber bien como como afecta cuatnas varaibles el poder de prediccion antes de hacer el modelo, sin emabnrgo encontre esa funcion de importnacia que solo funciona con randomFOrest y es para ver cuaels varaibles dan como mas importancia al modelo(sin mebargo no lo aplicque porq me aumento EL RMSE como mucho para supeustamente esa disminucion de varailbes(q debe ser por eso q digo q lo improntate es hacer eso pero com ocuando ya se tienen demasidads variables))
+
+#### boosting
+
+Nuevamente este como el boostrap, no es un modelo como tal, sino como un enfoque de mejora de modelos, donde lo q  se realiza es q se hace una prediccion inicial con un modelo 1, y los puntos q haya clasificado mal, se les da un peso mayor, y depues se hace otro modelo(del mismo tipo del anterior) dandole mas peso a esos puntos anteriores y hace la clasificacion (parece q el eerror de este nuevo modelo es menor debido a q ahora si clasifica los puntos anteriorres de mas peso)y asi se repite con todos los posibles modelos de ese tipo, donde al final teniendo en cuenta esas clasificaciones se les da un peso a cada modelo, lograndoce como un modelo de los modelos; **notece que a diferencia del bostrap, este no consiste en hacer un promedio de las predicciones individuales de cada modelo, sino de obtener como un modelo de modelos, como integrarlos**, aun asi se recalca que **LA IDEA DE CUALQUIER BOOSTING ES TOMAR AQUELLOS PREDICORES DEBILES Y AL PROEMDIARLOS PONDERADAMENTE SACAR UN MEJOR PREDICTOR**
+
+
+nota, en el sigueitne codigo habia usado el boosting de arboles, pero me dio lo miso q un solo arbol, asi q deicidi usarlo para otro clasfiicador
+```{r}
+Boostingg <- train(Binaria ~SHAPE_AREA+SHAPE_LEN,method="LogitBoost",data=training)
+BoostinggPrediccionClasifiacionLineal <- predict(Boostingg,test) 
+confusionMatrix(BoostinggPrediccionClasifiacionLineal,test$Binaria)
+```
+
+sin emabrgo se obtuvo el mismo resultado con uan regresion ligistica boosting
+
+```{r,results='hide'}
+set.seed(17)
+Boostingg2 <- train(Hombres ~.,method="gbm",data=training2)
+BoostinggPrediccionRegresionArbol <- predict(Boostingg2,test2) 
+```
+
+```{r}
+sqrt(sum((BoostinggPrediccionRegresionArbol-test2$Hombres)^2))
+```
+
+en este caso se opbtiene un error casi igual al del boostrap en el caso de arboles
+
+#### Model based prediction
+
+Se llama asi porque la idea es hacer un modelo basado en parámetros, basado en una dsitirbucion de probabilidad,
+
+
+**La idea es modela la probabilidad de q la predecida Y peretenezaca a una clase k(osea clasificandola)**, esa probaildiad genralmente se modela con el teroema de bayes, aparte de eso, se asume una ditribucion de proabilidad para las features dada esa clase k, y una probaildiad para el compoennte de Y(lo anterior es q básicamente los términos del numerado y denominaro de teorema de bayres se ven modifiacaso por cambiarlos pro una distirbucion noraml y una probialdid de Y y con eso se estiman los valores de miu y sigma y ya con eso se calcula esa probabilidad de que Y pertenezca a una clase k y ps la q tenga mas prob es a la q se le hace la clasificación
+
+Con este enfoque, funciona el de bayes, que asume independencia entre los features, el del modelo base aproacch que asume versiones mas complicadas para ma matriz de covarianzas, el análisis disciminate lineal y cuadrático, donde los dos usan una disitrbucon normnal multivariable solo q el lineal asume las mimsa covarianzas y el cuadraitco no
+
+#### anlisis disccriminante lineal
+
+funciona de la misma forma q lo anterior, tambn el obejtivo es esas probabildiaddes, solo que en este caso em vez del teorema de bayes se usa el logaritmo de el cociente entre la probilidad de que Y sea de la clase K dadas las features de x sobre la probabilida de que Y sea de la case J dadas las mismas X, entonces se hace el desarrollo algebraico de esa ecuación sabiendo q esas prob de las features para cada prob sera normales solo q uno para una clase y otra para octra clase y se obtiene una función apra esa probabilidad y esa función bascimente si se grafica son líneas, donde si lsoa datos esnta mas cerca a esa línea ps será de esa clase.
+
+basciamtne un nuevo calor de X(del conunto test), se reemplza en dicha funcion, se lcasifica entonces ese X con la clase que maximiza esa funcion y los parametors que lelgan a esa maixmizacion se estiman con funcon dem axima verosimilitud
+
+```{r}
+DiscriminanteClasificador <- train(Binaria ~ SHAPE_AREA+SHAPE_LEN,data=training,method="lda")
+DiscriminanteClasificadorPrediccion <- predict(DiscriminanteClasificador,test)
+confusionMatrix(DiscriminanteClasificadorPrediccion  ,test$Binaria)
+```
+```{r}
+DiscriminanteClasificador$finalModel$prior
+DiscriminanteClasificador$finalModel$counts
+DiscriminanteClasificador$finalModel$means
+DiscriminanteClasificador$finalModel$scaling
+```
+```{r}
+with(training,plot(SHAPE_AREA,SHAPE_LEN))
+points(181929.45,2120.077,pch=3,col="dark green",cex=4)# los datos de los means
+points(36901.01,1365.243,pch=3,col="purple",cex=4)# los datos de los means
+legend("topright",pch=c(3,3,19),col=c("dark green","purple","red"),legend=c("Metropolitano","Zonal","modelo discriminante"))
+points(training$SHAPE_AREA,(-8.266731e-06*training$SHAPE_AREA-4.226325e-06*training$SHAPE_LEN),col="red",pch=19)# se cogieron los datos del scaling
+```
+```{r}
+library(klaR)
+partimat(Binaria~SHAPE_AREA+SHAPE_LEN,data=training,method = "lda")
+```
+#### analisis cuadratico discriminante
+
+este realmente no es tratado en el curso, son emabrgo del amterial que tengo pro aparte tengo una fgrfica silimar a la anterior, ademas es solo cambair el metodo de "lda" a "qda"
+
+```{r}
+DiscriminanteClasificadorQ <- train(Binaria ~ SHAPE_AREA+SHAPE_LEN,data=training,method="qda")
+DiscriminanteClasificadorPrediccionQ <- predict(DiscriminanteClasificadorQ,test)
+confusionMatrix(DiscriminanteClasificadorPrediccionQ  ,test$Binaria)
+```
+```{r}
+partimat(Binaria~SHAPE_AREA+SHAPE_LEN,data=training,method = "qda")
+```
+fijece como el metodo cuadratico logra mejorar a alcanzar la presicion de el baggin de los arboles o el randomForest, u fijce q de mnaera grfica simplemente fue mover esa linea recta del disciminante lineal, un poquito abajo dandole como curva, haciendo que varios de esos ceros fuenbra clasificados correctamente
+
+NOta: lo aplique a datos de regresion y no funciono
+
+#### ingeniuo bayes
+
+lo mismo que se ha esxplciado pero la probialdia se sca con el teorema de bayes, se le dice ingenuo, esp orque asume indepnediencia entre las varaibles predicotras, lo cual no necesariamnte es cierto, sin emabrgo ap asersar de esa asumcion peude llegar a ser un buen calsificador
+
+
+```{r}
+library(naivebayes)
+VayesClasificacion <- naive_bayes(Binaria ~ SHAPE_AREA+SHAPE_LEN,data=training)
+VayesClasificacionPrediccion <- predict(VayesClasificacion,test[,c("SHAPE_AREA","SHAPE_LEN")])
+confusionMatrix(VayesClasificacionPrediccion   ,test$Binaria)
+```
+Nota: nuevamente utuliceun paquete especifico de Bayes, ya que caret daba el mismo resutlado pero entregaba una advertencia que no ecnontre mucha discusion al respecto.
+
+#### regresion regularizada
+
+basicamente teniendo en cuetna la idea base de que cuando se agregan mas predicotres el error en el test set en un punto aumenta y en el trainign simepre disminuye, y que si hay mas varaibles que observacioens la regresion lineal simple nomral de toda la vida no podra estimar los parametros para algunas de las variables; se eplcia apartir de esto la regresio nregularizada en el curso, que se intiduce que si se descopone la ecuacio nde regresion lineal, basciametne esta es un error ireducible que no sep uede modificar, mas un sesgo al cuadrado(osea si fuese 0 es insesgado osea predice perfecto) y una varianza, dodne estos dos ultimso temrinos si se pueden de cirta forma modificar para afectar el calculo del RMSE; entocnes esta regresion funciona en que en el calculo del RMS (suamrotisa de Y menos los betas por x al cuadrado) SE LE VA A SUMAR UN TERMINO DE PENALZIACION(creo q esto es la froma en la q estamos jugando con el sesgo y la varainza), donde dependiendo de la forma de este salen diferentes formas de regularizar la regresión(ridge y lasso que hago acontinuacion), en general, este termino lo q busca es hacer menos sensitiva la predecida Y resecpto la variable X, ósea si digamos solo se tiene 1 variable, si la beta da digamos 2, entonces quiere decir q por una unidad de incremento en X inceremneta Y en 2, lo q hace esta penalizacon, es disminuir este 2 por ejemplo a 1.5 o cosas asi, hasta el punto si es muy alta q hasta hace 0 ese beta, por ello si el beta es muy alto, entonces la suma de esa función(osea sumarle a la fucnioln de RMSE) va a hacer crecer el valor de RMSE alto(en otras palabras le estamos metiendo sesgo), por lo q como queremos minizar ese RMSE, la unicaa forma es disminuir esos betas dependiendo de lamda(q se obtenga con valdiaciomn cruzada)
+
+lo bueno de lo nateiro es que ahora asi se tuviense solo 2 puntos o observaiones, ya se podria hacer la regresion apra 10 variables o algo asi, por lo que al "disminur ese lamdna o movelor, se estan intentando estmiar los otros datos q no conocemos(eso toca comprobarlo dem anera practica)
+
+#### ridge regression
+
+se caracteriza proque el termino de penlizacion es sumarle al RMSE lamda por los betas al cuadrado
+
+```{r}
+CrestaRegresion <- train(Hombres ~., data=training2,method="ridge")#en español sera esa la traduccion
+CrestaRegresionPrediccion <- predict(CrestaRegresion,test2)
+sqrt(sum((CrestaRegresionPrediccion-test2$Hombres)^2))
+```
+#### lasso regression
+
+se caracteriza proque el termino de penlizacion es sumarle al RMSE lamda por lel valor absoluto de los betas; la diferncia con ridge de maenra teorica y rpactica puede ser alta peor esno no lo profundizare
+
+```{r}
+lazoRegresion <- train(Hombres ~., data=training2,method="lasso")#en español sera esa la traduccion
+lazoRegresionPrediccion <- predict(lazoRegresion,test2)
+sqrt(sum((lazoRegresionPrediccion-test2$Hombres)^2))
+```
+#### ensemble learning
+
+basicamente este consiste en obtener in modelo de modelos, osea a partir de las predicciones de cada modelo(en el test set) se utilizan como si fueran features o otra variables, aca es necesario crear otro conjunto de validacion, debido a que el test se utiliza para obtener esos features 
+
+**CLASIFICACION: **
+
+```{r}
+inBuild <- createDataPartition(y=datos$Binaria,p=0.7,list=FALSE)
+validation <- datos[-inBuild,]
+buildData <- datos[inBuild,]
+
+
+inTrain <- createDataPartition(y=buildData$Binaria,p=0.7,list=FALSE)
+training <- buildData[inTrain,]
+test <- buildData[-inTrain,]
+
+```
+
+
+```{r}
+Arbol <- train(Binaria ~SHAPE_AREA+SHAPE_LEN,method="rpart",data=training)
+Feature1 <- predict(Arbol,test)
+
+set.seed(17)
+
+predictores <- training[,c("SHAPE_AREA","SHAPE_LEN")]
+Apredecir <- training$Binaria
+BagDiscriminante <- bag(predictores,Apredecir,B=10,
+                    bagControl=bagControl(fit=ldaBag$fit,
+                               predict = ldaBag$pred,
+                               aggregate = ldaBag$aggregate)
+                    )
+
+Feature2 <- predict(BagDiscriminante,test[,c("SHAPE_AREA","SHAPE_LEN")])
+
+Bosque <- train(Binaria ~ SHAPE_AREA+SHAPE_LEN, data=training,method="rf")
+Feature3 <- predict(Bosque,test)
+
+BoostinggLogit <- train(Binaria ~SHAPE_AREA+SHAPE_LEN,method="LogitBoost",data=training)
+Feature4 <- predict(BoostinggLogit,test)
+
+
+DiscriminanteSoloL <- train(Binaria ~ SHAPE_AREA+SHAPE_LEN,data=training,method="lda")
+Feature5 <- predict(DiscriminanteSoloL,test)
+
+DiscriminanteSoloQ <- train(Binaria ~ SHAPE_AREA+SHAPE_LEN,data=training,method="qda")
+Feature6 <- predict(DiscriminanteSoloQ,test)
+
+Bayess <- naive_bayes(Binaria ~ SHAPE_AREA+SHAPE_LEN,data=training)
+Feature7 <- predict(Bayess,test[,c("SHAPE_AREA","SHAPE_LEN")])
+
+Featuress <- data.frame(Feature1,Feature2,Feature3,Feature4,Feature5,Feature6,Feature7,Binaria=test$Binaria)
+
+
+ModeloEnsemble <- train(Binaria ~ ., data=Featuress,method="rf")#notece que ahopra usamos el test cmo si fuera in training, donde las features tambn se sacaron del test
+
+
+```
+sucede que ahora para probar el modelo, este dependera de las features predecidas, osea q no le pasamos direcatmetne el validation set, sino que ap arit de lso mdoelos predecimos desde el validation y eso es lo q le pasamos al modelo final
+
+```{r}
+Feature1V <- predict(Arbol,validation)#notece que ahora predeicmos en el de validacion y este sera como el data test para el modelo de modeols
+Feature2V <- predict(BagDiscriminante,validation[,c("SHAPE_AREA","SHAPE_LEN")])
+Feature3V <- predict(Bosque,validation)
+Feature4V <- predict(BoostinggLogit,validation)
+Feature5V <- predict(DiscriminanteSoloL ,validation)
+Feature6V <- predict(DiscriminanteSoloQ,validation)
+Feature7V <- predict(Bayess,validation[,c("SHAPE_AREA","SHAPE_LEN")])
+
+ComoSifueseELtest <- data.frame(Feature1=Feature1V,Feature2=Feature2V,Feature3=Feature3V,Feature4=Feature4V,Feature5=Feature5V,Feature6=Feature6V,Feature7=Feature7V)#notece que ponemos los nombres de las columnas iguales que "los features con lso q se creo el ultimo modelo")
+
+ModeloEnsemblePrediccion <- predict(ModeloEnsemble,ComoSifueseELtest)
+
+confusionMatrix(ModeloEnsemblePrediccion,validation$Binaria)
+```
+Fijece que pueda que la prsicion no sea tan alta, sin emabrgo se reaslta que la rpedccion esta basada en otras predicciones, osea como el ejemplo q alugna vez vi , que es teniendo encuenta diferentes miradas o puntos de vista o "aprendiozajes" esa podria ser la clasificacion
+
+Notece que se pudo habe realidazo vadiacion cruizada con todos los modelos(espeicalemnte el random forest) para evirtar sobreajustes
+```{r}
+confusionMatrix(Feature1V,validation$Binaria)$overall[1]
+confusionMatrix(Feature2V,validation$Binaria)$overall[1]
+confusionMatrix(Feature3V,validation$Binaria)$overall[1]
+confusionMatrix(Feature4V,validation$Binaria)$overall[1]
+confusionMatrix(Feature5V,validation$Binaria)$overall[1]
+confusionMatrix(Feature6V,validation$Binaria)$overall[1]
+confusionMatrix(Feature7V,validation$Binaria)$overall[1]
+
+```
+notece como los que ofrecieon "Peores" presiiones, fueron el dsicirmintate lineal con enfoque en bag, y el discriminatne lineal sencillo , los mas precisos fueron el arbol sencillo, el de bayes y el discriminatne cuadratico(fijece q el de bayes a pesar de asumir independencia lo cual puede no ser sierto entre el area y la longitud da un buen resultado); y como el el bosque aleatorio y el boosting entragan como una rpsicion "Media" que es la misma que entrga el modelo final, porl oqu e se ve que este de cierta forma "promedia" esas predciones de las otras "personas" o modelos
+
+**REGRESION:**
+
+```{r}
+
+
+inBuild <- createDataPartition(y=DeInteres2$Separador,p=0.7,list=FALSE)
+validation2 <- DeInteres2[-inBuild,]
+buildData <-  DeInteres2[inBuild,]
+
+
+inTrain <- createDataPartition(y=buildData$Separador,p=0.7,list=FALSE)
+training2 <- buildData[inTrain,]
+test2 <- buildData[-inTrain,]
+
+
+validation2 <- validation2[,-c(1,17)]
+training2 <- training2[,-c(1,17)]
+test2 <- test2[,-c(1,17)]
+
+```
+
+
+```{r,results='hide'}
+Arbol <- rpart(formula = Hombres ~ .,data= training2)
+Feature1 <- predict(Arbol,test2)
+
+
+set.seed(17)
+BagArbol <-  train(Hombres~.,method="treebag",data=training2)
+Feature2 <- predict(BagArbol,test2)
+
+Bosque <- train(Hombres~.,method="rf",data=training2)
+Feature3 <- predict(Bosque,test2)
+
+BoostinggLm <- train(Hombres ~.,method="BstLm",data=training2)
+Feature4 <- predict(BoostinggLm,test2)
+
+
+CrestaRegresion <- train(Hombres ~., data=training2[,-7],method="ridge")# se le quito una que tenia muchps ceros proq ponia mas warninfs
+Feature5 <- predict(CrestaRegresion,test2)
+
+lassooRegresion <- train(Hombres ~., data=training2,method="lasso")
+Feature6 <- predict(lassooRegresion,test2)
+
+
+Featuress <- data.frame(Feature1,Feature2,Feature3,Feature4,Feature5,Feature6,Hombres=test2$Hombres)
+
+
+ModeloEnsemble <- train(Hombres ~ ., data=Featuress,method="lm")#notece que ahopra usamos el test cmo si fuera in training, donde las features tambn se sacaron del test
+```
+
+
+```{r}
+Feature1V <- predict(Arbol,validation2)#notece que ahora predeicmos en el de validacion y este sera como el data test para el modelo de modeols
+Feature2V <- predict(BagArbol,validation2)
+Feature3V <- predict(Bosque,validation2)
+Feature4V <- predict(BoostinggLm,validation2)
+Feature5V <- predict(CrestaRegresion ,validation2)
+Feature6V <- predict(lassooRegresion,validation2)
+
+ComoSifueseELtest <- data.frame(Feature1=Feature1V,Feature2=Feature2V,Feature3=Feature3V,Feature4=Feature4V,Feature5=Feature5V,Feature6=Feature6V)#notece que ponemos los nombres de las columnas iguales que "los features con lso q se creo el ultimo modelo")
+
+ModeloEnsemblePrediccion <- predict(ModeloEnsemble,ComoSifueseELtest)
+
+sqrt(sum((ModeloEnsemblePrediccion-validation2$Hombres)^2))
+
+```
+```{r}
+sqrt(sum((Feature1V-validation2$Hombres)^2))
+sqrt(sum((Feature2V-validation2$Hombres)^2))
+sqrt(sum((Feature3V-validation2$Hombres)^2))
+sqrt(sum((Feature4V-validation2$Hombres)^2))
+sqrt(sum((Feature5V-validation2$Hombres)^2))
+sqrt(sum((Feature6V-validation2$Hombres)^2))
+```
+Fijece como aparitr de esos errores ran grandes(especialemtne para los arboles y aquelos q no eran de similares a la regersion lineal), se lograr llegar a un error ran pequeño
+
+#### Seleccion del modelo
+
+una vez entendidos todos los otros modelos, es necesario resaltar que apra la seleccion de este, en un comienzo se nombraba que usar validacion cruzada(y nunca lo aplicaban realemnte, solo lo nombraban), esta la aplicare para obtener una mejor estimacion de cada modelo para despues comparar entre estos; el proceso de comapracion cosnsite en dividir los datos originales en este caso entre training, test y validacion, lo cual es bascimaente el mism oproceso que hicimos antes, solo q ahi no se creo validacion, en este caso el de validacion tomara el papel del test de antes y es para probar ya el modelo habiendo hecho validacion cruzada y todo y asi se escogera el modelo definitivo, y este ya se probara una unica vez en el conjunto de test
+
+
+
+
+```{r}
+set.seed(17)
+train.control <- trainControl(method="cv",number=10)
+
+modelo11 <- train(Hombres~.,data=training2,method="lm",trControl=train.control)
+modelo12 <- train(Hombres~.,data=training2,method="ridge",trControl=train.control)
+
+modelo11Prediccion <- predict(modelo11,test2)
+modelo12Prediccion <- predict(modelo12,test2)
+
+sqrt(sum((modelo11Prediccion-test2$Hombres)^2))
+sqrt(sum((modelo12Prediccion-test2$Hombres)^2))
+```
+notece que la regreison lineal pura con validacio ncruzada y todo, logra tener menos error que la ridge regresion, osea q la valdiacion cruzada nos da una buena miraada de la estimacion de cada modelo, sin emabrgo como qcon esto se escoge la regresion lineal, para saber relametne que tan bunea es toca probarla en el de validacion
+
+```{r}
+modelo11PrediccionV <- predict(modelo11,validation2)
+sqrt(sum((modelo11PrediccionV-validation2$Hombres)^2))
+
+```
+notece que sige siendo menor el error, pero aumento de cierta forma considerablemente resepcto al test sete que se utilizo tambn para esoxcger el modelo. asi serie lproceso de esocger el modelo, opbtener una buena estimacion de cada cmodelo que se comapra con valdiacio ncruzada, probarlos en un test set con el que se esocge uno, y se encuenta el verdadero valor en otro ocnjunto de vlaidacion con el modo definitivo
+
+
+Tambien para el caso de clasificaiocn, se peude osbervar de manera grafica la curva ROC, aca no la aplcio porq me parece que solo revisando los datos de la matriz de confusion es sificiente, sin emabrgo puede ser intenresnate para q de manera grafica que observe mejor esa tendencia de cada modelo a predecir mejor los falsos negativos o los falsos positovs y esos.
+
+
+#### series de tiempo
+
+de esto ya he realizado tros cursos, sin emnargo en este resalto es la forma de dividir entre trining y test para este tipo de datos
+
+```{r}
+library(quantmod)
+from.dat <- as.Date("01/01/20",format="%m/%d/%y")
+to.dat <- as.Date("12/31/21",format="%m/%d/%y")
+getSymbols("PFE",src="yahoo",from=from.dat,to=to.dat)
+mPizer <- to.monthly(PFE)
+Ajustados <- Ad(PFE)
+ts1 <- ts(Ajustados,frequency = 12)
+plot(ts1,xlab="Years+1",ylab="PFE")
+```
+sin duda como el creiciento ha sido tremendo en el año de pandemia
+
+```{r}
+plot(decompose(ts1),xlab="Years+1")
+```
+```{r}
+ts1Train <- window(ts1,start=1,end=32)
+ts1Test <- window(ts1,start=32,end=(42-0.01))
+```
+
+#### promedio movil
+
+```{r}
+library(forecast)
+plot(ts1Train)
+lines(ma(ts1Train,order=3),col="red")
+```
+#### suaviazcion simple
+
+```{r}
+ets1 <- ets(ts1Train,model="MMM")
+fcast <- forecast(ets1)
+plot(fcast)
+lines(ts1Test,col="red")
+```
+asi seria la predcion de la suavuzacion simple y ka comaropacion al test(fijece q le atica como a los dos priemros dias, el resto ya no captura ese trend, con uno de wintesrs de pornto funcionaria mejor)
+
+```{r}
+accuracy(fcast,ts1Test)
+```
+aca se observaria el error, el RMSE seria de 1,67 en el test, para esto tocaria revisar mejor con ese argumento "MMM" a ver q metodos se peuden hacer ahi rapido
+
+#### Aprendizaje insupervizado
+
+sucede que todo lo que hemos hecho es aprendizaje supervizdo, debido a q predecimso algo que sabemos que deberia dar(osea tenemos un test con el cual probaboms q unos datos den otra columna q conocemos q es, hombres, tipo de parque...), pero tambn puede ser que no tengamos eso, singo que aparit de la clasfiicacion, generemos grupos, observemos un coportamientos **Y NO SEPAMOS ESO QUE GRUPOS SON O QUE NOS INDICA ESO*** esto es el aprendizaje insupervizado y es relaemtne dificil llegar a determinar que es el patron que se presente
+
+```{r}
+kmeans11 <- kmeans(training[,c("SHAPE_AREA","SHAPE_LEN")],centers=2)
+training$clusters <- as.factor(kmeans11$cluster)
+qplot(SHAPE_AREA,SHAPE_LEN,colour=clusters,data=training)
+```
+
+```{r}
+table(kmeans11$cluster,as.numeric(training$Binaria))
+```
+notece como se "malo" podria llegar a ser esta clasificacion si solo huibiesemos tenido los datos de araee y longitud, intentar depterminar cuantos parques de cada tipo hay seria un fracaso
+
+```{r}
+Unsupervizado <- train(clusters~SHAPE_AREA+SHAPE_LEN,data=training,method="rpart")
+table(predict(Unsupervizado,training),training$Binaria)
+```
+fijece como la idea seria, apartir de la obtencion se las supeustas clases que habrian, crear un predictor que ahora prediga esas clases q no sabemso que sera(en este caso sabemso q ran tipo de parque y es muy malo el rendimientom aunq el arbol no hace tan mal la calsfiiacion esos "supeustos" grupos q arroja el kmeans)
+
+
+
+
+
+
+
